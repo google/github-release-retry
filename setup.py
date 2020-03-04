@@ -29,7 +29,7 @@ def get_long_description() -> str:
 
 setup(
     name="github-release-retry",
-    version="1.0.2",
+    version="1.0.3",
     description="A tool for creating GitHub Releases and uploading assets reliably.",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
