@@ -336,9 +336,12 @@ def upload_file(
         wait_time = wait_time * 2
 
         log("Uploading asset.")
-        response = g.upload_asset(file_path, release)
-        if response.status_code != requests.codes.created:
-            log(f"Ignoring failed upload: {response}")
+        try:
+            response = g.upload_asset(file_path, release)
+            if response.status_code != requests.codes.created:
+                log(f"Ignoring failed upload: {response}")
+        except Exception as ex:  # pylint: disable=broad-except;
+            log(f"Ignoring upload exception: {ex}")
 
         # And now we loop.
 
@@ -483,7 +486,7 @@ github-release-retry \\
         "--retry_limit",
         help="The number of times to retry uploading a file. ",
         type=int,
-        default=5,
+        default=10,
     )
 
     parser.add_argument(
