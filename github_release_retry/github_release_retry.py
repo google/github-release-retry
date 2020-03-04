@@ -436,14 +436,14 @@ github-release-retry \\
     parser.add_argument(
         "--target_commitish",
         help="The commit-ish value where the tag will be created. Unused if the tag already exists. ",
-        type=Optional[str],
+        type=str,
         default=None,
     )
 
     parser.add_argument(
         "--release_name",
         help="The name of the release. Leave unset to use the tag_name (recommended). ",
-        type=Optional[str],
+        type=str,
         default=None,
     )
 
@@ -452,12 +452,12 @@ github-release-retry \\
     body_group.add_argument(
         "--body_string",
         help="Required (or use --body_file): Text describing the release. Ignored if the release already exists.",
-        type=Optional[str],
+        type=str,
     )
     body_group.add_argument(
         "--body_file",
         help="Required (or use --body_string): Text describing the release, which will be read from BODY_FILE. Ignored if the release already exists.",
-        type=Optional[Path],
+        type=str,
     )
 
     parser.add_argument(
