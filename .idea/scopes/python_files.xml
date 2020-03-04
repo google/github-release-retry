@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="python_files" pattern="file[github-release-retry]:github_release_retry//*.py||file[github-release-retry]:github_release_retry_tests//*.py" />
+</component>
