@@ -41,7 +41,7 @@ def remove_none_fields(dic: Any) -> Any:
 
 
 def to_dict(obj: DataClassJsonMixin) -> Any:  # pylint: disable=used-before-assignment;
-    return remove_none_fields(obj.to_dict(encode_json=False))
+    return remove_none_fields(obj.to_dict())
 
 
 def log(message: str) -> None:
