@@ -65,7 +65,7 @@ class GithubClientError(DataClassJsonMixin):
 class Asset(DataClassJsonMixin):
     url: Optional[str] = None
     browser_download_url: Optional[str] = None
-    id: Optional[str] = None  # noqa: VNE003
+    id: Optional[str] = None  # noqa: VNE003, A003
     name: Optional[str] = None
     label: Optional[str] = None
     state: Optional[str] = None
@@ -76,7 +76,7 @@ class Asset(DataClassJsonMixin):
 @dataclass
 class Release(DataClassJsonMixin):
     upload_url: Optional[str] = None
-    id: Optional[str] = None  # noqa: VNE003
+    id: Optional[str] = None  # noqa: VNE003, A003
     tag_name: Optional[str] = None
     target_commitish: Optional[str] = None
     name: Optional[str] = None
@@ -361,7 +361,7 @@ def make_release(
     log("Creating the release.")
     response = g.create_release(release)
     if response.status_code != requests.codes.created:
-        log(f"Failed...")
+        log("Failed...")
         # Try to decode the error.
         try:
             error: GithubClientError = GithubClientError.from_json(response.content)
