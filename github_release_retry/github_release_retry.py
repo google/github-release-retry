@@ -45,7 +45,7 @@ def to_dict(obj: DataClassJsonMixin) -> Any:  # pylint: disable=used-before-assi
 
 
 def log(message: str) -> None:
-    print(message)  # noqa: T001
+    print(message, file=sys.stderr)  # noqa: T001
 
 
 @dataclass
