@@ -42,8 +42,8 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         'dataclasses;python_version=="3.6"',
-        "dataclasses-json==0.5.*",
-        "requests==2.*",
+        "dataclasses-json",
+        "requests",
     ],
     package_data={"github_release_retry": ["py.typed"]},
     classifiers=[
