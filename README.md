@@ -103,8 +103,8 @@ optional arguments:
                         The GitHub API URL without a trailing slash. (default:
                         https://api.github.com)
   --retry_limit RETRY_LIMIT
-                        The number of times to retry uploading a file.
-                        (default: 5)
+                        The number of times to retry creating/getting the
+                        release and/or uploading each file. (default: 10)
 ```
 
 ## Development

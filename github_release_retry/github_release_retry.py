@@ -358,36 +358,64 @@ def make_release(
     if not release.tag_name:
         raise AssertionError("tag_name must be provided")
 
-    log("Creating the release.")
-    response = g.create_release(release)
-    if response.status_code != requests.codes.created:
-        log("Failed...")
-        # Try to decode the error.
+    retry_count = 0
+    wait_time = 2
+
+    while True:
         try:
-            error: GithubClientError = GithubClientError.from_json(response.content)
-        except json.JSONDecodeError:
-            raise UnexpectedResponseError(response)
+            log("Creating the release.")
+            response = g.create_release(release)
+            if response.status_code != requests.codes.created:
+                log("Failed...")
+                # Try to decode the error.
+                try:
+                    error: GithubClientError = GithubClientError.from_json(
+                        response.content
+                    )
+                except json.JSONDecodeError:
+                    raise UnexpectedResponseError(response)
 
-        if not error.errors:
-            raise UnexpectedResponseError(response)
+                if not error.errors:
+                    raise UnexpectedResponseError(response)
 
-        if (
-            error.errors[0].resource != "Release"
-            or error.errors[0].code != "already_exists"
-        ):
-            raise UnexpectedResponseError(response)
+                if (
+                    (not error.errors)
+                    or error.errors[0].resource != "Release"
+                    or error.errors[0].code != "already_exists"
+                ):
+                    raise UnexpectedResponseError(response)
 
-        log("...but this is OK, because the release already exists.")
-        log("Getting the current release.")
-        response = g.get_release_by_tag(release.tag_name)
-        if response.status_code != requests.codes.ok:
-            raise UnexpectedResponseError(response)
+                log("...but this is OK, because the release already exists.")
+                log("Getting the current release.")
+                response = g.get_release_by_tag(release.tag_name)
+                if response.status_code != requests.codes.ok:
+                    raise UnexpectedResponseError(response)
 
-    log("Decoding release info.")
-    try:
-        release = Release.from_json(response.content)
-    except json.JSONDecodeError:
-        raise UnexpectedResponseError(response)
+                log("Decoding release info.")
+                try:
+                    release = Release.from_json(response.content)
+                except json.JSONDecodeError:
+                    raise UnexpectedResponseError(response)
+
+        except UnexpectedResponseError as ex:
+            log(
+                f"Unexpected response when creating the release or getting the existing release info:\n{ex}..."
+            )
+            # Note: GitHub will sometimes return a custom error for the Release resource with a message:
+            # "Published releases must have a valid tag".
+            # I suspect this is a race condition that occurs when multiple clients try to create the release at the same
+            # time, or this is a race condition that occurs within GitHub itself when creating the tag as part of
+            # creating the release. Thus, we retry creating/getting the release.
+            if retry_count >= g.retry_limit:
+                raise HitRetryLimitError("Hit retry limit for creating release.")
+            log("...retrying.")
+            time.sleep(wait_time)
+            retry_count += 1
+            wait_time = wait_time * 2
+            continue
+
+        # Exit the loop.
+        break
 
     for file_path in file_paths:
         upload_file(g, release, file_path)
@@ -484,7 +512,7 @@ github-release-retry \\
 
     parser.add_argument(
         "--retry_limit",
-        help="The number of times to retry uploading a file. ",
+        help="The number of times to retry creating/getting the release and/or uploading each file. ",
         type=int,
         default=10,
     )
