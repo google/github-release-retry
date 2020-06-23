@@ -391,12 +391,6 @@ def make_release(
                 if response.status_code != requests.codes.ok:
                     raise UnexpectedResponseError(response)
 
-                log("Decoding release info.")
-                try:
-                    release = Release.from_json(response.content)
-                except json.JSONDecodeError:
-                    raise UnexpectedResponseError(response)
-
         except UnexpectedResponseError as ex:
             log(
                 f"Unexpected response when creating the release or getting the existing release info:\n{ex}..."
@@ -416,6 +410,13 @@ def make_release(
 
         # Exit the loop.
         break
+
+    log("Decoding release info.")
+    try:
+        # noinspection PyUnboundLocalVariable
+        release = Release.from_json(response.content)
+    except json.JSONDecodeError:
+        raise UnexpectedResponseError(response)
 
     for file_path in file_paths:
         upload_file(g, release, file_path)
