@@ -62,6 +62,12 @@ ignore =
   # Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue.
   S301
 
+  # Ignore words from requests, like unprocessable
+  SC200
+
+  # Ignore hardcoded tokens for tests
+  S106
+
 # per-file-ignores =
 
 # For flake8-quotes:

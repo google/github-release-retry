@@ -62,7 +62,9 @@ setup(
         "Documentation": "https://github.com/google/github-release-retry",
         "Source": "https://github.com/google/github-release-retry",
     },
-    entry_points={"console_scripts": [
-        "github-release-retry = github_release_retry.github_release_retry:main",
-    ]},
+    entry_points={
+        "console_scripts": [
+            "github-release-retry = github_release_retry.github_release_retry:main",
+        ]
+    },
 )
