@@ -18,16 +18,33 @@ set -x
 set -e
 set -u
 
-# Check for some known files for sanity.
-test -f ./Pipfile
+help | head
 
-if [ -z ${VIRTUAL_ENV+x} ]; then
-  source .venv/bin/activate
-fi
+uname
 
-python ci/check_headers.py
-mypy --strict --show-absolute-path github_release_retry github_release_retry_tests
-pylint github_release_retry github_release_retry_tests
-# Flake checks formatting via black.
-flake8 .
-pytest github_release_retry_tests
+case "$(uname)" in
+"Linux")
+  ACTIVATE_PATH=".venv/bin/activate"
+  export PYTHON=python
+  ;;
+
+"Darwin")
+  ACTIVATE_PATH=".venv/bin/activate"
+  export PYTHON=python
+  ;;
+
+"MINGW"*|"MSYS_NT"*)
+  ACTIVATE_PATH=".venv/Scripts/activate"
+  export PYTHON=python.exe
+  ;;
+
+*)
+  echo "Unknown OS"
+  exit 1
+  ;;
+esac
+
+./dev_shell.sh.template
+# shellcheck disable=SC1090
+source "${ACTIVATE_PATH}"
+./check_all.sh

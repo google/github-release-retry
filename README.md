@@ -123,7 +123,12 @@ We currently target Python 3.6+.
 > distribution.
 > Alternatively, see "Installing Python" below if you want to use Python 3.6.
 
-The script generates and activates a Python virtual environment (located at `.venv/`) with all dependencies installed.
+The script generates a Python virtual environment (located at `.venv/`) with all dependencies installed.
+Activate the Python virtual environment via:
+
+* `source .venv/bin/activate` (on Linux)
+* `source .venv/Scripts/activate` (on Windows with the Git Bash shell)
+* `.venv/Scripts/activate.bat` (on Windows with cmd)
 
 
 ### Presubmit checks
@@ -152,14 +157,7 @@ Add `whitelist.dic` as a custom dictionary (search for "Spelling" in Actions). D
 
 ## Terminal
 
-The `Terminal` tab in PyCharm is useful and will use the project's Python virtual environment. In any other terminal, use:
-
-* `source .venv/bin/activate` (on Linux)
-* `source .venv/Scripts/activate` (on Windows with the Git Bash shell)
-* `.venv/Scripts/activate.bat` (on Windows with cmd)
-
-You can alternatively execute the `./dev_shell.sh` script, but this is fairly slow as it checks and reinstalls all dependencies
-
+The `Terminal` tab in PyCharm is useful and will use the project's Python virtual environment.
 
 ## Installing Python
 

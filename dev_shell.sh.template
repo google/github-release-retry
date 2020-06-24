@@ -32,7 +32,8 @@ PYTHON=${PYTHON-python3.6}
 # that is being used, and so pipenv will create a virtual environment using
 # some other version of Python. This line ensures the virtual environment
 # created uses the correct Python binary.
-export PIPENV_PYTHON="${PYTHON}"
+PIPENV_PYTHON="$(which "${PYTHON}")"
+export PIPENV_PYTHON
 
 # Upgrade/install pip and pipenv if needed.
 "${PYTHON}" -m pip install --upgrade --user --no-warn-script-location 'pip>=19.2.3' 'pipenv>=2018.11.26'
@@ -46,9 +47,3 @@ export PIPENV_IGNORE_PIPFILE=1
 # Install project dependencies, including development dependencies, into the
 # virtual environment using pipenv.
 "${PYTHON}" -m pipenv install --dev
-
-if [ -z ${SKIP_SHELL+x} ]; then
-  # Enter the virtual environment, unless SKIP_SHELL is defined.
-  # `python` should now point to the correct version of Python.
-  "${PYTHON}" -m pipenv shell
-fi
