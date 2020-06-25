@@ -1,4 +1,5 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 # Copyright 2020 The github-release-retry Project Authors
 #
@@ -14,21 +15,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -x
-set -e
-set -u
+import json
+import os
+from typing import Any
 
-# Check for some known files for sanity.
-test -f ./Pipfile
 
-if [ -z ${VIRTUAL_ENV+x} ]; then
-  source .venv/bin/activate
-fi
-
-python ci/check_headers.py
-mypy --strict --show-absolute-path github_release_retry github_release_retry_tests
-pylint github_release_retry github_release_retry_tests
-# Flake checks formatting via black.
-flake8 .
-
-pytest github_release_retry_tests
+class GitHubTestCase:
+    @classmethod
+    def get_fixture(cls, filename: str) -> Any:
+        location = os.path.realpath(
+            os.path.join(os.getcwd(), os.path.dirname(__file__))
+        )
+        fixture = os.path.join(location, "fixtures", filename)
+        with open(fixture, encoding="utf-8", errors="ignore") as json_file:
+            data = json.load(json_file)
+            return data
