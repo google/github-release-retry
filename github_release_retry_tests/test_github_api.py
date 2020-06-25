@@ -26,13 +26,13 @@ from github_release_retry_tests.testcase import GitHubTestCase
 class TestGithubApi(GitHubTestCase):
     @staticmethod
     def test_github_api_invalid_token() -> None:
-        github = GithubApi(
+        github = GithubApi(  # noqa: S106
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
             token="INVALID_TOKEN",
             retry_limit=10,
-        )  # noqa: S106
+        )
         assert github.token == "INVALID_TOKEN"
 
         release = Release(
@@ -49,13 +49,13 @@ class TestGithubApi(GitHubTestCase):
         assert github_release.status_code == requests.codes.unauthorized
 
     def test_create_release_with_mock_requests_already_exists(self) -> None:
-        github = GithubApi(
+        github = GithubApi(  # noqa: S106
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
             token="VALID_MOCK_TOKEN",
             retry_limit=10,
-        )  # noqa: S106
+        )
         assert github.token == "VALID_MOCK_TOKEN"
 
         release = Release(
@@ -85,13 +85,13 @@ class TestGithubApi(GitHubTestCase):
             assert github_release.status_code == requests.codes.unprocessable_entity
 
     def test_get_release_by_tag_mock_data(self) -> None:
-        github = GithubApi(
+        github = GithubApi(  # noqa: S106
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
             token="VALID_MOCK_TOKEN",
             retry_limit=10,
-        )  # noqa: S106
+        )
         assert github.token == "VALID_MOCK_TOKEN"
 
         release = Release(
