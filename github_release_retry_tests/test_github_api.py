@@ -30,9 +30,9 @@ class TestGithubApi(GitHubTestCase):
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
-            token="INVALID_TOKEN",  # noqa: S106
+            token="INVALID_TOKEN",
             retry_limit=10,
-        )
+        )  # noqa: S106
         assert github.token == "INVALID_TOKEN"
 
         release = Release(
@@ -53,9 +53,9 @@ class TestGithubApi(GitHubTestCase):
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
-            token="VALID_MOCK_TOKEN",  # noqa: S106
+            token="VALID_MOCK_TOKEN",
             retry_limit=10,
-        )
+        )  # noqa: S106
         assert github.token == "VALID_MOCK_TOKEN"
 
         release = Release(
@@ -89,9 +89,9 @@ class TestGithubApi(GitHubTestCase):
             github_api_url="https://api.github.com",
             user="google",
             repo="github-release-retry",
-            token="VALID_MOCK_TOKEN",  # noqa: S106
+            token="VALID_MOCK_TOKEN",
             retry_limit=10,
-        )
+        )  # noqa: S106
         assert github.token == "VALID_MOCK_TOKEN"
 
         release = Release(
