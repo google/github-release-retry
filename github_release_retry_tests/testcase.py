@@ -23,10 +23,10 @@ from typing import Any
 class GitHubTestCase:
     @classmethod
     def get_fixture(cls, filename: str) -> Any:
-        __location__ = os.path.realpath(
+        location = os.path.realpath(
             os.path.join(os.getcwd(), os.path.dirname(__file__))
         )
-        fixture = os.path.join(__location__, "fixtures", filename)
-        with open(fixture) as json_file:
+        fixture = os.path.join(location, "fixtures", filename)
+        with open(fixture, encoding="utf-8", errors="ignore") as json_file:
             data = json.load(json_file)
             return data

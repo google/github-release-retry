@@ -31,5 +31,4 @@ pylint github_release_retry github_release_retry_tests
 # Flake checks formatting via black.
 flake8 .
 
-# Uncomment once we have some tests.
 pytest github_release_retry_tests
