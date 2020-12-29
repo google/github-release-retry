@@ -285,7 +285,7 @@ def upload_file(
     g: GithubApi, release: Release, file_path: Path  # noqa: VNE001
 ) -> None:
 
-    log(f"\nUpload: {file_path.name}")
+    log(f"Uploading: {file_path.name}")
 
     file_size = file_path.stat().st_size
 
@@ -295,33 +295,29 @@ def upload_file(
     # Only exit the loop if we manage to verify that the asset has the expected size and state, or if we hit the retry limit.
     while True:
 
-        existing_asset_id = g.find_asset_id_by_file_name(file_path.name, release)
-        if existing_asset_id:
-            log("Asset exists.")
-            log("Getting asset info.")
-            response = g.get_asset_by_id(existing_asset_id)
-            if response.status_code != requests.codes.ok:
-                raise UnexpectedResponseError(response)
+        if retry_count:
+            existing_asset_id = g.find_asset_id_by_file_name(file_path.name, release)
+            if existing_asset_id:
+                log("  Asset exists: Getting asset info.")
+                response = g.get_asset_by_id(existing_asset_id)
+                if response.status_code != requests.codes.ok:
+                    raise UnexpectedResponseError(response)
 
-            log("Decoding asset info.")
-            try:
-                existing_asset = Asset.from_json(response.content)
-            except json.JSONDecodeError:
-                raise UnexpectedResponseError(response)
+                try:
+                    existing_asset = Asset.from_json(response.content)
+                except json.JSONDecodeError:
+                    raise UnexpectedResponseError(response)
 
-            if existing_asset.size == file_size and existing_asset.state == "uploaded":
-                log("The asset has the correct size and state. Asset done.\n")
-                return
+                if existing_asset.size == file_size and existing_asset.state == "uploaded":
+                    log(f"  {file_path} exists with the correct size and state. Asset done.")
+                    return
 
-            log('The asset looks bad (wrong size or state was not "uploaded").')
-
-            log("Deleting asset.")
-
-            response = g.delete_asset(existing_asset_id)
-            if response.status_code != requests.codes.no_content:
-                log(f"Ignoring failed deletion: {response}")
+                log('  Deleting asset: The asset looks bad (wrong size or state was not "uploaded").')
+                response = g.delete_asset(existing_asset_id)
+                if response.status_code != requests.codes.no_content:
+                    log(f"  Ignoring failed deletion: {response}")
         else:
-            log("Asset does not exist.")
+            log("  Asset does not exist.")
 
         # Asset does not exist or has now been deleted.
 
@@ -329,19 +325,19 @@ def upload_file(
             raise HitRetryLimitError("Hit upload retry limit.")
 
         if retry_count > 0:
-            log(f"Waiting {wait_time} seconds before retrying upload.")
+            log(f"  Waiting {wait_time} seconds before retrying upload.")
             time.sleep(wait_time)
 
         retry_count += 1
         wait_time = wait_time * 2
 
-        log("Uploading asset.")
+        log("  Uploading asset.")
         try:
             response = g.upload_asset(file_path, release)
             if response.status_code != requests.codes.created:
-                log(f"Ignoring failed upload: {response}")
+                log(f"  Ignoring failed upload: {response}")
         except Exception as ex:  # pylint: disable=broad-except;
-            log(f"Ignoring upload exception: {ex}")
+            log(f"  Ignoring upload exception: {ex}")
 
         # And now we loop.
 
@@ -418,7 +414,26 @@ def make_release(
     except json.JSONDecodeError:
         raise UnexpectedResponseError(response)
 
-    for file_path in file_paths:
+    print('Github release has:', len(release.assets), 'assets.')
+
+    uploaded_assets_by_name = {a.name: a for a in release.assets}
+
+    # sort already uploaded assets first, so they are checked first
+    # and we then proceed to uploads afterwards
+    paths_sorted_by_asset_state = sorted(
+        file_paths,
+        key=lambda fp: (uploaded_assets_by_name.get(fp, Asset()).state or '') != "uploaded",
+        reverse=True,
+    )
+    for i, file_path in enumerate(paths_sorted_by_asset_state, 1):
+        # do not check things that are known to exist correctly in the release
+        file_size = file_path.stat().st_size
+        existing_asset = uploaded_assets_by_name.get(file_path.name)
+        if existing_asset and existing_asset.size == file_size and existing_asset.state == "uploaded":
+            log(f"{file_path} exists with the correct size and state. Asset done.")
+            continue
+
+        log(f"\nUploaded {i} assets.\n")
         upload_file(g, release, file_path)
 
 
