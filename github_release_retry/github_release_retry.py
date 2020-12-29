@@ -308,11 +308,18 @@ def upload_file(
                 except json.JSONDecodeError:
                     raise UnexpectedResponseError(response)
 
-                if existing_asset.size == file_size and existing_asset.state == "uploaded":
-                    log(f"  {file_path} exists with the correct size and state. Asset done.")
+                if (
+                    existing_asset.size == file_size
+                    and existing_asset.state == "uploaded"
+                ):
+                    log(
+                        f"  {file_path} exists with the correct size and state. Asset done."
+                    )
                     return
 
-                log('  Deleting asset: The asset looks bad (wrong size or state was not "uploaded").')
+                log(
+                    '  Deleting asset: The asset looks bad (wrong size or state was not "uploaded").'
+                )
                 response = g.delete_asset(existing_asset_id)
                 if response.status_code != requests.codes.no_content:
                     log(f"  Ignoring failed deletion: {response}")
@@ -414,7 +421,7 @@ def make_release(
     except json.JSONDecodeError:
         raise UnexpectedResponseError(response)
 
-    print('Github release has:', len(release.assets), 'assets.')
+    print("Github release has:", len(release.assets), "assets.")
 
     uploaded_assets_by_name = {a.name: a for a in release.assets}
 
@@ -422,14 +429,19 @@ def make_release(
     # and we then proceed to uploads afterwards
     paths_sorted_by_asset_state = sorted(
         file_paths,
-        key=lambda fp: (uploaded_assets_by_name.get(fp, Asset()).state or '') != "uploaded",
+        key=lambda fp: (uploaded_assets_by_name.get(fp, Asset()).state or "")
+        != "uploaded",
         reverse=True,
     )
     for i, file_path in enumerate(paths_sorted_by_asset_state, 1):
         # do not check things that are known to exist correctly in the release
         file_size = file_path.stat().st_size
         existing_asset = uploaded_assets_by_name.get(file_path.name)
-        if existing_asset and existing_asset.size == file_size and existing_asset.state == "uploaded":
+        if (
+            existing_asset
+            and existing_asset.size == file_size
+            and existing_asset.state == "uploaded"
+        ):
             log(f"{file_path} exists with the correct size and state. Asset done.")
             continue
 
