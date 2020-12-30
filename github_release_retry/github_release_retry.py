@@ -292,6 +292,20 @@ def upload_file(
     retry_count = 0
     wait_time = 2
 
+    # Optimization:
+    # We don't trust the |release| object; assets that exist on the releases web page might be missing from this object.
+    # However, if the asset *does* exist in the |release| object, and has the correct size and state, then we can assume
+    # it has already been uploaded without making any further remote API calls.
+    if release.assets:
+        for asset in release.assets:
+            if (
+                asset.name == file_path.name
+                and asset.size == file_size
+                and asset.state == "uploaded"
+            ):
+                log("The asset has the correct size and state. Asset done.\n")
+                return
+
     # Only exit the loop if we manage to verify that the asset has the expected size and state, or if we hit the retry limit.
     while True:
 
