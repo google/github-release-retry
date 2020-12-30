@@ -281,7 +281,7 @@ class HitRetryLimitError(Exception):
     pass
 
 
-def upload_file(
+def upload_file(  # pylint: disable=too-many-branches;
     g: GithubApi, release: Release, file_path: Path  # noqa: VNE001
 ) -> None:
 
