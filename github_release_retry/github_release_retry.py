@@ -110,7 +110,7 @@ class GithubApi(DataClassJsonMixin):
     @staticmethod
     def _wait() -> None:
         # Don't make too many requests per second.
-        # We are unlikely to hit official rate limits, BUT repeated polling can look like abuse.
+        # We are unlikely to reach official rate limits, BUT repeated polling can look like abuse.
         # TODO: revisit this if needed.
         time.sleep(1)
 
@@ -277,7 +277,7 @@ class UnexpectedResponseError(Exception):
         super().__init__(f"Unexpected response: {response.__dict__}")
 
 
-class HitRetryLimitError(Exception):
+class ReachedRetryLimitError(Exception):
     pass
 
 
@@ -306,7 +306,8 @@ def upload_file(  # pylint: disable=too-many-branches;
                 log("The asset has the correct size and state. Asset done.\n")
                 return
 
-    # Only exit the loop if we manage to verify that the asset has the expected size and state, or if we hit the retry limit.
+    # Only exit the loop if we manage to verify that the asset has the expected size and state, or if we reach the retry
+    # limit.
     while True:
 
         existing_asset_id = g.find_asset_id_by_file_name(file_path.name, release)
@@ -340,7 +341,7 @@ def upload_file(  # pylint: disable=too-many-branches;
         # Asset does not exist or has now been deleted.
 
         if retry_count >= g.retry_limit:
-            raise HitRetryLimitError("Hit upload retry limit.")
+            raise ReachedRetryLimitError("Reached upload retry limit.")
 
         if retry_count > 0:
             log(f"Waiting {wait_time} seconds before retrying upload.")
@@ -415,7 +416,9 @@ def make_release(
             # time, or this is a race condition that occurs within GitHub itself when creating the tag as part of
             # creating the release. Thus, we retry creating/getting the release.
             if retry_count >= g.retry_limit:
-                raise HitRetryLimitError("Hit retry limit for creating release.")
+                raise ReachedRetryLimitError(
+                    "Reached retry limit for creating release."
+                )
             log("...retrying.")
             time.sleep(wait_time)
             retry_count += 1
