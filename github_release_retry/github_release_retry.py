@@ -48,6 +48,44 @@ def log(message: str) -> None:
     print(message, file=sys.stderr)  # noqa: T001
 
 
+def release_asset_node_id_to_asset_id(node_id: str) -> str:
+    """
+    Extracts and returns the asset id from the given Release Asset |node_id|.
+
+    The "id" returned from the GraphQL v4 API is called the "node_id" in the REST API v3.
+    We can get back to the REST "id" by decoding the "node_id" (it is base64 encoded)
+    and extracting the id number at the end.
+
+    :param node_id: The Release Asset node_id.
+    :return: The extracted REST API v3 asset id.
+    """
+    # There is a new format and an old format.
+
+    if node_id.startswith("RA_"):
+        # New format: "RA_[base64 encoded bytes]".
+        # The last four bytes (big-endian, unsigned) of the base64 encoded bytes are the node id.
+
+        # Strip off the "RA_".
+        base64_string = node_id[3:]
+
+        asset_id = str(int.from_bytes(base64.b64decode(base64_string)[-4:], "big"))
+    else:
+        # Old format: just a base64 encoded string.
+        # Once decoded, the format is similar to "012:ReleaseAsset18381577".  # noqa: SC100
+        # The asset id part is 18381577.
+        node_id_decoded: str = base64.b64decode(node_id).decode(
+            encoding="utf-8", errors="ignore"
+        )
+        if "ReleaseAsset" not in node_id_decoded:
+            raise AssertionError(
+                f"Unrecognized node_id format: {node_id}. Decoded (base64) string: {node_id_decoded}."
+            )
+
+        asset_id = node_id_decoded.split("ReleaseAsset")[1]
+
+    return asset_id
+
+
 @dataclass
 class GithubResourceError(DataClassJsonMixin):
     resource: Optional[str] = None
@@ -180,7 +218,7 @@ class GithubApi(DataClassJsonMixin):
         """
         Returns the asset id.
 
-        :returns the asset id or 0 if the asset was not found.
+        :returns the asset id or None if the asset was not found.
         """
         # We get the asset id via GitHub's v4 GraphQL API, as this seems to be more reliable.
         # But most other operations still require using the REST v3 API.
@@ -240,23 +278,11 @@ query {{
             return None
 
         try:
-            node_id = assets[0]["id"]
+            node_id: str = assets[0]["id"]
         except KeyError:
             raise UnexpectedResponseError(response)
 
-        # The id we get from the GraphQL API is called the "node_id" in the REST API v3.
-        # We can get back to the REST id by decoding the node_id (it is base64 encoded)
-        # and extracting the number at the end.
-        # Once decoded, the node_id is similar to "012:ReleaseAsset18381577".  # noqa: SC100
-        # The id part is 18381577.
-
-        node_id_decoded: str = base64.b64decode(node_id).decode(
-            encoding="utf-8", errors="ignore"
-        )
-
-        asset_id = node_id_decoded.split("ReleaseAsset")[1]
-
-        return asset_id
+        return release_asset_node_id_to_asset_id(node_id)
 
 
 class MissingTokenError(Exception):
