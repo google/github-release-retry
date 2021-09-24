@@ -24,3 +24,5 @@ dirname
 testcase
 unprocessable
 S106
+endian
+exc

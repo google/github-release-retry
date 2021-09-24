@@ -88,7 +88,7 @@ def exclude_filename(f: str):
 def go():
     fail = False
     copyright_pattern = re.compile(
-        r"Copyright 20(18|19|20) The github-release-retry Project Authors"
+        r"Copyright 20(18|19|20|21) The github-release-retry Project Authors"
     )
 
     for (dirpath, dirnames, filenames) in os.walk(os.curdir):
