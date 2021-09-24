@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import time
+import traceback
 import typing
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,13 +49,30 @@ def log(message: str) -> None:
     print(message, file=sys.stderr)  # noqa: T001
 
 
+def log_exception(message: str) -> None:
+    log(message)
+    traceback.print_exc(file=sys.stderr)
+    log("")
+
+
+def log_response(response: requests.Response) -> None:
+    log(f"status_code: {response.status_code}")
+    if response.content:
+        try:
+            content = response.content.decode(encoding="utf-8", errors="ignore")
+            log(f"content: {content}")
+        except Exception:  # pylint: disable=broad-except;
+            log(f"content: {response.content!r}")
+    log("")
+
+
 def release_asset_node_id_to_asset_id(node_id: str) -> str:
     """
     Extracts and returns the asset id from the given Release Asset |node_id|.
 
     The "id" returned from the GraphQL v4 API is called the "node_id" in the REST API v3.
     We can get back to the REST "id" by decoding the "node_id" (it is base64 encoded)
-    and extracting the id number at the end.
+    and extracting the id number at the end, but this is undocumented and may change.
 
     :param node_id: The Release Asset node_id.
     :return: The extracted REST API v3 asset id.
@@ -182,7 +200,6 @@ class GithubApi(DataClassJsonMixin):
         )
 
     def upload_asset(self, file_path: Path, release: Release) -> requests.Response:
-
         if not release.upload_url:
             raise AssertionError("Need release object with upload_url.")
 
@@ -218,12 +235,17 @@ class GithubApi(DataClassJsonMixin):
         """
         Returns the asset id.
 
+        This relies on undocumented behavior; see release_asset_node_id_to_asset_id.
+
         :returns the asset id or None if the asset was not found.
         """
+        if not release.tag_name:
+            raise AssertionError("Expected tag_name")
+
         # We get the asset id via GitHub's v4 GraphQL API, as this seems to be more reliable.
         # But most other operations still require using the REST v3 API.
 
-        log(f"Finding asset id of {file_name}.")
+        log(f"Finding asset id using v4 API of {file_name}.")
 
         query = f"""
 query {{
@@ -284,6 +306,31 @@ query {{
 
         return release_asset_node_id_to_asset_id(node_id)
 
+    def verify_asset_size_and_state_via_v3_api(
+        self, file_name: str, file_size: int, tag_name: str, release: Optional[Release]
+    ) -> bool:
+        if not release:
+            log("Getting the current release again to check asset status.")
+            response = self.get_release_by_tag(tag_name)
+            if response.status_code != requests.codes.ok:
+                raise UnexpectedResponseError(response)
+            log("Decoding release info.")
+            try:
+                release = Release.from_json(response.content)
+            except json.JSONDecodeError:
+                raise UnexpectedResponseError(response)
+
+        if release.assets:
+            for asset in release.assets:
+                if (
+                    asset.name == file_name
+                    and asset.size == file_size
+                    and asset.state == "uploaded"
+                ):
+                    log("The asset has the correct size and state. Asset done.\n")
+                    return True
+        return False
+
 
 class MissingTokenError(Exception):
     pass
@@ -307,7 +354,7 @@ class ReachedRetryLimitError(Exception):
     pass
 
 
-def upload_file(  # pylint: disable=too-many-branches;
+def upload_file(  # pylint: disable=too-many-branches,too-many-nested-blocks,too-many-statements;
     g: GithubApi, release: Release, file_path: Path  # noqa: VNE001
 ) -> None:
 
@@ -318,53 +365,92 @@ def upload_file(  # pylint: disable=too-many-branches;
     retry_count = 0
     wait_time = 2
 
+    if not release.tag_name:
+        raise AssertionError("Expected tag_name")
+
     # Optimization:
-    # We don't trust the |release| object; assets that exist on the releases web page might be missing from this object.
-    # However, if the asset *does* exist in the |release| object, and has the correct size and state, then we can assume
-    # it has already been uploaded without making any further remote API calls.
-    if release.assets:
-        for asset in release.assets:
-            if (
-                asset.name == file_path.name
-                and asset.size == file_size
-                and asset.state == "uploaded"
-            ):
-                log("The asset has the correct size and state. Asset done.\n")
-                return
+    # The v3 API does not always show assets that are in a bad state, but if the asset *does* exist with the correct
+    # size and state, then we can assume the asset was successfully uploaded.
+    # We use the existing |release| object, which means we might be able to skip making any further remote API calls.
+    try:
+        if g.verify_asset_size_and_state_via_v3_api(
+            file_name=file_path.name,
+            file_size=file_size,
+            tag_name=release.tag_name,
+            release=release,
+        ):
+            return
+    except Exception:  # pylint: disable=broad-except;
+        log_exception(
+            "Ignoring exception that occurred when trying to check asset status with the v3 API."
+        )
 
     # Only exit the loop if we manage to verify that the asset has the expected size and state, or if we reach the retry
     # limit.
     while True:
+        # We use try-except liberally so that we always at least try to blindly upload the asset (towards the end of the
+        # loop), because this may well succeed and then the asset checking code may also be more likely to succeed on
+        # subsequent iterations.
 
-        existing_asset_id = g.find_asset_id_by_file_name(file_path.name, release)
-        if existing_asset_id:
-            log("Asset exists.")
-            log("Getting asset info.")
-            response = g.get_asset_by_id(existing_asset_id)
-            if response.status_code != requests.codes.ok:
-                raise UnexpectedResponseError(response)
-
-            log("Decoding asset info.")
-            try:
-                existing_asset = Asset.from_json(response.content)
-            except json.JSONDecodeError:
-                raise UnexpectedResponseError(response)
-
-            if existing_asset.size == file_size and existing_asset.state == "uploaded":
-                log("The asset has the correct size and state. Asset done.\n")
+        # Optimization:
+        # The v3 API does not always show assets that are in a bad state, but if the asset *does* exist with the
+        # correct size and state, then we can assume the asset was successfully uploaded, without relying on
+        # undocumented behavior.
+        # We pass release=None, which forces a fresh fetch of the Release object.
+        try:
+            if g.verify_asset_size_and_state_via_v3_api(
+                file_name=file_path.name,
+                file_size=file_size,
+                tag_name=release.tag_name,
+                release=None,
+            ):
                 return
+        except Exception:  # pylint: disable=broad-except;
+            log_exception(
+                "Ignoring exception that occurred when trying to check asset status with the v3 API."
+            )
 
-            log('The asset looks bad (wrong size or state was not "uploaded").')
+        # We now try to get the asset details via the v4 API.
+        # This allows us to delete the asset if it is in a bad state, but relies on undocumented behavior.
+        try:
+            existing_asset_id = g.find_asset_id_by_file_name(file_path.name, release)
+            if existing_asset_id:
+                log("Asset exists.")
+                log("Getting asset info.")
+                response = g.get_asset_by_id(existing_asset_id)
+                if response.status_code != requests.codes.ok:
+                    raise UnexpectedResponseError(response)
 
-            log("Deleting asset.")
+                log("Decoding asset info.")
+                try:
+                    existing_asset = Asset.from_json(response.content)
+                except json.JSONDecodeError:
+                    raise UnexpectedResponseError(response)
 
-            response = g.delete_asset(existing_asset_id)
-            if response.status_code != requests.codes.no_content:
-                log(f"Ignoring failed deletion: {response}")
-        else:
-            log("Asset does not exist.")
+                if (
+                    existing_asset.size == file_size
+                    and existing_asset.state == "uploaded"
+                ):
+                    log("The asset has the correct size and state. Asset done.\n")
+                    return
 
-        # Asset does not exist or has now been deleted.
+                log('The asset looks bad (wrong size or state was not "uploaded").')
+
+                log("Deleting asset.")
+
+                response = g.delete_asset(existing_asset_id)
+                if response.status_code != requests.codes.no_content:
+                    log("Ignoring failed deletion.")
+                    log_response(response)
+            else:
+                log("Asset does not exist.")
+        except Exception:  # pylint: disable=broad-except;
+            log_exception(
+                "Ignoring exception that occurred when trying to check asset status with the v4 API."
+            )
+
+        # Asset does not exist, has been deleted, or an error occurred.
+        # Upload the asset, regardless.
 
         if retry_count >= g.retry_limit:
             raise ReachedRetryLimitError("Reached upload retry limit.")
@@ -380,9 +466,10 @@ def upload_file(  # pylint: disable=too-many-branches;
         try:
             response = g.upload_asset(file_path, release)
             if response.status_code != requests.codes.created:
-                log(f"Ignoring failed upload: {response}")
-        except Exception as ex:  # pylint: disable=broad-except;
-            log(f"Ignoring upload exception: {ex}")
+                log("Ignoring failed upload.")
+                log_response(response)
+        except Exception:  # pylint: disable=broad-except;
+            log_exception("Ignoring upload exception.")
 
         # And now we loop.
 
@@ -432,9 +519,9 @@ def make_release(
                 if response.status_code != requests.codes.ok:
                     raise UnexpectedResponseError(response)
 
-        except UnexpectedResponseError as ex:
-            log(
-                f"Unexpected response when creating the release or getting the existing release info:\n{ex}..."
+        except UnexpectedResponseError:
+            log_exception(
+                "Unexpected response when creating the release or getting the existing release info."
             )
             # Note: GitHub will sometimes return a custom error for the Release resource with a message:
             # "Published releases must have a valid tag".
